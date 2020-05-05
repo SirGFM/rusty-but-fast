@@ -265,6 +265,103 @@ pub mod tlv {
         T::get_tag(T::from_buf(buf))
     }
 
+    impl std::convert::From<&Tag> for i8 {
+        fn from(t: &Tag) -> Self {
+            match t {
+                Tag::I8(v) => *v,
+                _ => panic!("Not an i8 tag!"),
+            }
+        }
+    }
+    impl std::convert::From<&Tag> for u8 {
+        fn from(t: &Tag) -> Self {
+            match t {
+                Tag::U8(v) => *v,
+                _ => panic!("Not an u8 tag!"),
+            }
+        }
+    }
+    impl std::convert::From<&Tag> for i16 {
+        fn from(t: &Tag) -> Self {
+            match t {
+                Tag::I16(v) => *v,
+                _ => panic!("Not an i16 tag!"),
+            }
+        }
+    }
+    impl std::convert::From<&Tag> for u16 {
+        fn from(t: &Tag) -> Self {
+            match t {
+                Tag::U16(v) => *v,
+                _ => panic!("Not an u16 tag!"),
+            }
+        }
+    }
+    impl std::convert::From<&Tag> for i32 {
+        fn from(t: &Tag) -> Self {
+            match t {
+                Tag::I32(v) => *v,
+                _ => panic!("Not an i32 tag!"),
+            }
+        }
+    }
+    impl std::convert::From<&Tag> for u32 {
+        fn from(t: &Tag) -> Self {
+            match t {
+                Tag::U32(v) => *v,
+                _ => panic!("Not an u32 tag!"),
+            }
+        }
+    }
+    impl std::convert::From<&Tag> for i64 {
+        fn from(t: &Tag) -> Self {
+            match t {
+                Tag::I64(v) => *v,
+                _ => panic!("Not an i64 tag!"),
+            }
+        }
+    }
+    impl std::convert::From<&Tag> for u64 {
+        fn from(t: &Tag) -> Self {
+            match t {
+                Tag::U64(v) => *v,
+                _ => panic!("Not an u64 tag!"),
+            }
+        }
+    }
+    impl std::convert::From<&Tag> for i128 {
+        fn from(t: &Tag) -> Self {
+            match t {
+                Tag::I128(v) => *v,
+                _ => panic!("Not an i128 tag!"),
+            }
+        }
+    }
+    impl std::convert::From<&Tag> for u128 {
+        fn from(t: &Tag) -> Self {
+            match t {
+                Tag::U128(v) => *v,
+                _ => panic!("Not an u128 tag!"),
+            }
+        }
+    }
+    impl std::convert::From<&Tag> for char {
+        fn from(t: &Tag) -> Self {
+            match t {
+                Tag::Char(v) => *v,
+                _ => panic!("Not an char tag!"),
+            }
+        }
+    }
+    impl std::convert::From<&Tag> for bool {
+        fn from(t: &Tag) -> Self {
+            match t {
+                Tag::Bool(v) => *v,
+                _ => panic!("Not an bool tag!"),
+            }
+        }
+    }
+
     pub struct TagParser<'a> {
         cur: Tag,
         next: &'a[u8],
@@ -439,11 +536,9 @@ pub mod tlv {
                     tp.read_arr::<u8>(&mut buf);
                     assert_eq!(buf.len(), extra_data[extra_data_idx].len());
                     for j in 0..buf.len() {
-                        if let Tag::U8(v) = extra_data[extra_data_idx][j] {
-                            assert_eq!(buf[j], v);
-                        } else {
-                            panic!("Invalid u8-array!");
-                        }
+                        let tag = &extra_data[extra_data_idx][j];
+                        let v = u8::from(tag);
+                        assert_eq!(buf[j], v);
                     }
                     test_buf = tp.next;
                     extra_data_idx += 1;
@@ -456,11 +551,9 @@ pub mod tlv {
                     tp.read_arr::<u32>(&mut buf);
                     assert_eq!(buf.len(), extra_data[extra_data_idx].len());
                     for j in 0..buf.len() {
-                        if let Tag::U32(v) = extra_data[extra_data_idx][j] {
-                            assert_eq!(buf[j], v);
-                        } else {
-                            panic!("Invalid u32-array!");
-                        }
+                        let tag = &extra_data[extra_data_idx][j];
+                        let v = u32::from(tag);
+                        assert_eq!(buf[j], v);
                     }
                     test_buf = tp.next;
                     extra_data_idx += 1;
