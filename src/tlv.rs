@@ -20,6 +20,131 @@ pub mod tlv {
         Invalid,
     }
 
+    trait TagParseHelper<T> {
+        fn get_tag(v: T) -> Tag where T: Sized;
+        fn get_zero_tag() -> Tag;
+        fn get_size() -> usize;
+        fn name() -> &'static str;
+        fn from_buf(buf: &[u8]) -> T where T: Sized;
+    }
+
+    impl TagParseHelper<u8> for u8 {
+        fn get_tag(v: u8) -> Tag { Tag::U8(v) }
+        fn get_zero_tag() -> Tag { Tag::U8(0) }
+        fn get_size() -> usize { std::mem::size_of::<u8>() }
+        fn name() -> &'static str { "u8" }
+        fn from_buf(buf: &[u8]) -> u8 { buf[0] }
+    }
+    impl TagParseHelper<i8> for i8 {
+        fn get_tag(v: i8) -> Tag { Tag::I8(v) }
+        fn get_zero_tag() -> Tag { Tag::I8(0) }
+        fn get_size() -> usize { std::mem::size_of::<i8>() }
+        fn name() -> &'static str { "i8" }
+        fn from_buf(buf: &[u8]) -> i8 { buf[0] as i8 }
+    }
+    impl TagParseHelper<u16> for u16 {
+        fn get_tag(v: u16) -> Tag { Tag::U16(v) }
+        fn get_zero_tag() -> Tag { Tag::U16(0) }
+        fn get_size() -> usize { std::mem::size_of::<u16>() }
+        fn name() -> &'static str { "u16" }
+        fn from_buf(buf: &[u8]) -> u16 {
+            let arr = [buf[0], buf[1]];
+            u16::from_be_bytes(arr)
+        }
+    }
+    impl TagParseHelper<i16> for i16 {
+        fn get_tag(v: i16) -> Tag { Tag::I16(v) }
+        fn get_zero_tag() -> Tag { Tag::I16(0) }
+        fn get_size() -> usize { std::mem::size_of::<i16>() }
+        fn name() -> &'static str { "i16" }
+        fn from_buf(buf: &[u8]) -> i16 {
+            let arr = [buf[0], buf[1]];
+            i16::from_be_bytes(arr)
+        }
+    }
+    impl TagParseHelper<u32> for u32 {
+        fn get_tag(v: u32) -> Tag { Tag::U32(v) }
+        fn get_zero_tag() -> Tag { Tag::U32(0) }
+        fn get_size() -> usize { std::mem::size_of::<u32>() }
+        fn name() -> &'static str { "u32" }
+        fn from_buf(buf: &[u8]) -> u32 {
+            let arr = [buf[0], buf[1], buf[2], buf[3]];
+            u32::from_be_bytes(arr)
+        }
+    }
+    impl TagParseHelper<i32> for i32 {
+        fn get_tag(v: i32) -> Tag { Tag::I32(v) }
+        fn get_zero_tag() -> Tag { Tag::I32(0) }
+        fn get_size() -> usize { std::mem::size_of::<i32>() }
+        fn name() -> &'static str { "i32" }
+        fn from_buf(buf: &[u8]) -> i32 {
+            let arr = [buf[0], buf[1], buf[2], buf[3]];
+            i32::from_be_bytes(arr)
+        }
+    }
+    impl TagParseHelper<u64> for u64 {
+        fn get_tag(v: u64) -> Tag { Tag::U64(v) }
+        fn get_zero_tag() -> Tag { Tag::U64(0) }
+        fn get_size() -> usize { std::mem::size_of::<u64>() }
+        fn name() -> &'static str { "u64" }
+        fn from_buf(buf: &[u8]) -> u64 {
+            let arr = [buf[0], buf[1], buf[2], buf[3],
+                       buf[4], buf[5], buf[6], buf[7]];
+            u64::from_be_bytes(arr)
+        }
+    }
+    impl TagParseHelper<i64> for i64 {
+        fn get_tag(v: i64) -> Tag { Tag::I64(v) }
+        fn get_zero_tag() -> Tag { Tag::I64(0) }
+        fn get_size() -> usize { std::mem::size_of::<i64>() }
+        fn name() -> &'static str { "i64" }
+        fn from_buf(buf: &[u8]) -> i64 {
+            let arr = [buf[0], buf[1], buf[2], buf[3],
+                       buf[4], buf[5], buf[6], buf[7]];
+            i64::from_be_bytes(arr)
+        }
+    }
+    impl TagParseHelper<u128> for u128 {
+        fn get_tag(v: u128) -> Tag { Tag::U128(v) }
+        fn get_zero_tag() -> Tag { Tag::U128(0) }
+        fn get_size() -> usize { std::mem::size_of::<u128>() }
+        fn name() -> &'static str { "u128" }
+        fn from_buf(buf: &[u8]) -> u128 {
+            let arr = [buf[0], buf[1], buf[2], buf[3],
+                       buf[4], buf[5], buf[6], buf[7],
+                       buf[8], buf[9], buf[10], buf[11],
+                       buf[12], buf[13], buf[14], buf[15]];
+            u128::from_be_bytes(arr)
+        }
+    }
+    impl TagParseHelper<i128> for i128 {
+        fn get_tag(v: i128) -> Tag { Tag::I128(v) }
+        fn get_zero_tag() -> Tag { Tag::I128(0) }
+        fn get_size() -> usize { std::mem::size_of::<i128>() }
+        fn name() -> &'static str { "i128" }
+        fn from_buf(buf: &[u8]) -> i128 {
+            let arr = [buf[0], buf[1], buf[2], buf[3],
+                       buf[4], buf[5], buf[6], buf[7],
+                       buf[8], buf[9], buf[10], buf[11],
+                       buf[12], buf[13], buf[14], buf[15]];
+            i128::from_be_bytes(arr)
+        }
+    }
+    impl TagParseHelper<char> for char {
+        fn get_tag(v: char) -> Tag { Tag::Char(v) }
+        fn get_zero_tag() -> Tag { Tag::Char('\0') }
+        fn get_size() -> usize { std::mem::size_of::<char>() }
+        fn name() -> &'static str { "char" }
+        fn from_buf(buf: &[u8]) -> char { buf[0] as char }
+    }
+    impl TagParseHelper<bool> for bool {
+        fn get_tag(v: bool) -> Tag { Tag::Bool(v) }
+        fn get_zero_tag() -> Tag { Tag::Bool(false) }
+        fn get_size() -> usize { std::mem::size_of::<bool>() }
+        fn name() -> &'static str { "bool" }
+        fn from_buf(buf: &[u8]) -> bool { buf[0] != 0 }
+    }
+
     impl std::cmp::PartialEq for Tag {
         fn eq(&self, other: &Self) -> bool {
             match (self, other) {
@@ -133,6 +258,13 @@ pub mod tlv {
         }
     }
 
+    fn tag_from_buf<T>(buf: &[u8]) -> Tag
+    where
+        T: TagParseHelper<T>
+    {
+        T::get_tag(T::from_buf(buf))
+    }
+
     pub struct TagParser<'a> {
         cur: Tag,
         next: &'a[u8],
@@ -154,70 +286,18 @@ pub mod tlv {
 
             let cur: Tag;
             match tag {
-                Tag::I8(_) => {
-                    let arr = [ buf[0] ];
-                    let v = i8::from_be_bytes(arr);
-                    cur = Tag::I8(v);
-                },
-                Tag::U8(_) => {
-                    cur = Tag::U8(buf[0]);
-                },
-                Tag::I16(_) => {
-                    let arr = [buf[0], buf[1]];
-                    let v = i16::from_be_bytes(arr);
-                    cur = Tag::I16(v);
-                },
-                Tag::U16(_) => {
-                    let arr = [buf[0], buf[1]];
-                    let v = u16::from_be_bytes(arr);
-                    cur = Tag::U16(v);
-                },
-                Tag::I32(_) => {
-                    let arr = [buf[0], buf[1], buf[2], buf[3]];
-                    let v = i32::from_be_bytes(arr);
-                    cur = Tag::I32(v);
-                },
-                Tag::U32(_) => {
-                    let arr = [buf[0], buf[1], buf[2], buf[3]];
-                    let v = u32::from_be_bytes(arr);
-                    cur = Tag::U32(v);
-                },
-                Tag::I64(_) => {
-                    let arr = [buf[0], buf[1], buf[2], buf[3],
-                               buf[4], buf[5], buf[6], buf[7]];
-                    let v = i64::from_be_bytes(arr);
-                    cur = Tag::I64(v);
-                },
-                Tag::U64(_) => {
-                    let arr = [buf[0], buf[1], buf[2], buf[3],
-                               buf[4], buf[5], buf[6], buf[7]];
-                    let v = u64::from_be_bytes(arr);
-                    cur = Tag::U64(v);
-                },
-                Tag::I128(_) => {
-                    let arr = [buf[0], buf[1], buf[2], buf[3],
-                               buf[4], buf[5], buf[6], buf[7],
-                               buf[8], buf[9], buf[10], buf[11],
-                               buf[12], buf[13], buf[14], buf[15]];
-                    let v = i128::from_be_bytes(arr);
-                    cur = Tag::I128(v);
-                },
-                Tag::U128(_) => {
-                    let arr = [buf[0], buf[1], buf[2], buf[3],
-                               buf[4], buf[5], buf[6], buf[7],
-                               buf[8], buf[9], buf[10], buf[11],
-                               buf[12], buf[13], buf[14], buf[15]];
-                    let v = u128::from_be_bytes(arr);
-                    cur = Tag::U128(v);
-                },
-                Tag::Char(_) => {
-                    let v: char = buf[0] as char;
-                    cur = Tag::Char(v);
-                },
-                Tag::Bool(_) => {
-                    let v = buf[0] != 0;
-                    cur = Tag::Bool(v);
-                },
+                Tag::I8(_) => cur = tag_from_buf::<i8>(buf),
+                Tag::U8(_) => cur = tag_from_buf::<u8>(buf),
+                Tag::I16(_) => cur = tag_from_buf::<i16>(buf),
+                Tag::U16(_) => cur = tag_from_buf::<u16>(buf),
+                Tag::I32(_) => cur = tag_from_buf::<i32>(buf),
+                Tag::U32(_) => cur = tag_from_buf::<u32>(buf),
+                Tag::I64(_) => cur = tag_from_buf::<i64>(buf),
+                Tag::U64(_) => cur = tag_from_buf::<u64>(buf),
+                Tag::I128(_) => cur = tag_from_buf::<i128>(buf),
+                Tag::U128(_) => cur = tag_from_buf::<u128>(buf),
+                Tag::Char(_) => cur = tag_from_buf::<char>(buf),
+                Tag::Bool(_) => cur = tag_from_buf::<bool>(buf),
                 Tag::Array(_, _) => {
                     let arr = [buf[0], buf[1], buf[2], buf[3]];
                     let len = u32::from_be_bytes(arr);
@@ -238,53 +318,17 @@ pub mod tlv {
     }
 
     impl TagParser<'_> {
-        fn read_arr_i8(&mut self, out: &mut [i8]) {
+        fn read_arr<T>(&mut self, out: &mut [T])
+        where
+            T: TagParseHelper<T>
+        {
             if let Tag::Array(l, t) = self.cur {
-                if let Tag::I8(0) = Tag::from(t) {
+                if T::get_zero_tag() == Tag::from(t) {
                     let l = l as usize;
-                    if out.len() < l {
-                        panic!("Output buffer too small for i8-array");
-                    }
-
-                    let buf = &self.next[..l];
-                    self.next = &self.next[l..];
-
-                    for i in 0..buf.len() {
-                        out[i] = buf[i] as i8;
-                    }
-                }
-            }
-            panic!("Invalid i8-array tag!");
-        }
-
-        fn read_arr_u8(&mut self, out: &mut [u8]) {
-            if let Tag::Array(l, t) = self.cur {
-                if let Tag::U8(0) = Tag::from(t) {
-                    let l = l as usize;
-                    if out.len() < l {
-                        panic!("Output buffer too small for u8-array");
-                    }
-
-                    let buf = &self.next[..l];
-                    self.next = &self.next[l..];
-
-                    for i in 0..buf.len() {
-                        out[i] = buf[i] as u8;
-                    }
-                    return;
-                }
-            }
-            panic!("Invalid u8-array tag!");
-        }
-
-        fn read_arr_i16(&mut self, out: &mut [i16]) {
-            if let Tag::Array(l, t) = self.cur {
-                if let Tag::I16(0) = Tag::from(t) {
-                    let l = l as usize;
-                    let s = std::mem::size_of::<i16>();
+                    let s = T::get_size();
                     let ret_size = l * s;
                     if out.len() < l {
-                        panic!("Output buffer too small for i16-array");
+                        panic!("Output buffer too small for {}-array", T::name());
                     }
 
                     let buf = &self.next[..ret_size];
@@ -292,229 +336,12 @@ pub mod tlv {
 
                     for i in 0..l {
                         let j = i * s;
-                        let arr = [buf[j], buf[j+1]];
-                        out[i] = i16::from_be_bytes(arr);
+                        out[i] = T::from_buf(&buf[j..]);
                     }
                     return;
                 }
             }
-            panic!("Invalid i16-array tag!");
-        }
-
-        fn read_arr_u16(&mut self, out: &mut [u16]) {
-            if let Tag::Array(l, t) = self.cur {
-                if let Tag::U16(0) = Tag::from(t) {
-                    let l = l as usize;
-                    let s = std::mem::size_of::<u16>();
-                    let ret_size = l * s;
-                    if out.len() < l {
-                        panic!("Output buffer too small for u16-array");
-                    }
-
-                    let buf = &self.next[..ret_size];
-                    self.next = &self.next[ret_size..];
-
-                    for i in 0..l {
-                        let j = i * s;
-                        let arr = [buf[j], buf[j+1]];
-                        out[i] = u16::from_be_bytes(arr);
-                    }
-                    return;
-                }
-            }
-            panic!("Invalid u16-array tag!");
-        }
-
-        fn read_arr_i32(&mut self, out: &mut [i32]) {
-            if let Tag::Array(l, t) = self.cur {
-                if let Tag::I32(0) = Tag::from(t) {
-                    let l = l as usize;
-                    let s = std::mem::size_of::<i32>();
-                    let ret_size = l * s;
-                    if out.len() < l {
-                        panic!("Output buffer too small for i32-array");
-                    }
-
-                    let buf = &self.next[..ret_size];
-                    self.next = &self.next[ret_size..];
-
-                    for i in 0..l {
-                        let j = i * s;
-                        let arr = [buf[j], buf[j+1], buf[j+2], buf[j+3]];
-                        out[i] = i32::from_be_bytes(arr);
-                    }
-                    return;
-                }
-            }
-            panic!("Invalid i32-array tag!");
-        }
-
-        fn read_arr_u32(&mut self, out: &mut [u32]) {
-            if let Tag::Array(l, t) = self.cur {
-                if let Tag::U32(0) = Tag::from(t) {
-                    let l = l as usize;
-                    let s = std::mem::size_of::<u32>();
-                    let ret_size = l * s;
-                    if out.len() < l {
-                        panic!("Output buffer too small for u32-array");
-                    }
-
-                    let buf = &self.next[..ret_size];
-                    self.next = &self.next[ret_size..];
-
-                    for i in 0..l {
-                        let j = i * s;
-                        let arr = [buf[j], buf[j+1], buf[j+2], buf[j+3]];
-                        out[i] = u32::from_be_bytes(arr);
-                    }
-                    return;
-                }
-            }
-            panic!("Invalid u32-array tag!");
-        }
-
-        fn read_arr_i64(&mut self, out: &mut [i64]) {
-            if let Tag::Array(l, t) = self.cur {
-                if let Tag::I64(0) = Tag::from(t) {
-                    let l = l as usize;
-                    let s = std::mem::size_of::<i64>();
-                    let ret_size = l * s;
-                    if out.len() < l {
-                        panic!("Output buffer too small for i64-array");
-                    }
-
-                    let buf = &self.next[..ret_size];
-                    self.next = &self.next[ret_size..];
-
-                    for i in 0..l {
-                        let j = i * s;
-                        let arr = [buf[j], buf[j+1], buf[j+2], buf[j+3],
-                                   buf[j+4], buf[j+5], buf[j+6], buf[j+7]];
-                        out[i] = i64::from_be_bytes(arr);
-                    }
-                    return;
-                }
-            }
-            panic!("Invalid i64-array tag!");
-        }
-
-        fn read_arr_u64(&mut self, out: &mut [u64]) {
-            if let Tag::Array(l, t) = self.cur {
-                if let Tag::U64(0) = Tag::from(t) {
-                    let l = l as usize;
-                    let s = std::mem::size_of::<u64>();
-                    let ret_size = l * s;
-                    if out.len() < l {
-                        panic!("Output buffer too small for u64-array");
-                    }
-
-                    let buf = &self.next[..ret_size];
-                    self.next = &self.next[ret_size..];
-
-                    for i in 0..l {
-                        let j = i * s;
-                        let arr = [buf[j], buf[j+1], buf[j+2], buf[j+3],
-                                   buf[j+4], buf[j+5], buf[j+6], buf[j+7]];
-                        out[i] = u64::from_be_bytes(arr);
-                    }
-                    return;
-                }
-            }
-            panic!("Invalid u64-array tag!");
-        }
-
-        fn read_arr_i128(&mut self, out: &mut [i128]) {
-            if let Tag::Array(l, t) = self.cur {
-                if let Tag::I128(0) = Tag::from(t) {
-                    let l = l as usize;
-                    let s = std::mem::size_of::<i128>();
-                    let ret_size = l * s;
-                    if out.len() < l {
-                        panic!("Output buffer too small for i128-array");
-                    }
-
-                    let buf = &self.next[..ret_size];
-                    self.next = &self.next[ret_size..];
-
-                    for i in 0..l {
-                        let j = i * s;
-                        let arr = [buf[j], buf[j+1], buf[j+2], buf[j+3],
-                                   buf[j+4], buf[j+5], buf[j+6], buf[j+7],
-                                   buf[j+8], buf[j+9], buf[j+10], buf[j+11],
-                                   buf[j+12], buf[j+13], buf[j+14], buf[j+15]];
-                        out[i] = i128::from_be_bytes(arr);
-                    }
-                    return;
-                }
-            }
-            panic!("Invalid i128-array tag!");
-        }
-
-        fn read_arr_u128(&mut self, out: &mut [u128]) {
-            if let Tag::Array(l, t) = self.cur {
-                if let Tag::U128(0) = Tag::from(t) {
-                    let l = l as usize;
-                    let s = std::mem::size_of::<u128>();
-                    let ret_size = l * s;
-                    if out.len() < l {
-                        panic!("Output buffer too small for u128-array");
-                    }
-
-                    let buf = &self.next[..ret_size];
-                    self.next = &self.next[ret_size..];
-
-                    for i in 0..l {
-                        let j = i * s;
-                        let arr = [buf[j], buf[j+1], buf[j+2], buf[j+3],
-                                   buf[j+4], buf[j+5], buf[j+6], buf[j+7],
-                                   buf[j+8], buf[j+9], buf[j+10], buf[j+11],
-                                   buf[j+12], buf[j+13], buf[j+14], buf[j+15]];
-                        out[i] = u128::from_be_bytes(arr);
-                    }
-                    return;
-                }
-            }
-            panic!("Invalid u128-array tag!");
-        }
-
-        fn read_arr_char(&mut self, out: &mut [char]) {
-            if let Tag::Array(l, t) = self.cur {
-                if let Tag::Char('\0') = Tag::from(t) {
-                    let l = l as usize;
-                    if out.len() < l {
-                        panic!("Output buffer too small for char-array");
-                    }
-
-                    let buf = &self.next[..l];
-                    self.next = &self.next[l..];
-
-                    for i in 0..l {
-                        out[i] = (buf[i] as char);
-                    }
-                    return;
-                }
-            }
-            panic!("Invalid char-array tag!");
-        }
-
-        fn read_arr_bool(&mut self, out: &mut [bool]) {
-            if let Tag::Array(l, t) = self.cur {
-                if let Tag::Bool(false) = Tag::from(t) {
-                    let l = l as usize;
-                    if out.len() < l {
-                        panic!("Output buffer too small for bool-array");
-                    }
-
-                    let buf = &self.next[..l];
-                    self.next = &self.next[l..];
-
-                    for i in 0..l {
-                        out[i] = (buf[i] != 0);
-                    }
-                    return;
-                }
-            }
-            panic!("Invalid bool-array tag!");
+            panic!("Invalid {}-array tag!", T::name());
         }
     }
 
@@ -609,7 +436,7 @@ pub mod tlv {
                     let mut buf = std::vec::Vec::<u8>::with_capacity(l);
                     buf.resize(l, 0);
                     let mut tp = tp;
-                    tp.read_arr_u8(&mut buf);
+                    tp.read_arr::<u8>(&mut buf);
                     assert_eq!(buf.len(), extra_data[extra_data_idx].len());
                     for j in 0..buf.len() {
                         if let Tag::U8(v) = extra_data[extra_data_idx][j] {
@@ -626,7 +453,7 @@ pub mod tlv {
                     let mut buf = std::vec::Vec::<u32>::with_capacity(l);
                     buf.resize(l, 0);
                     let mut tp = tp;
-                    tp.read_arr_u32(&mut buf);
+                    tp.read_arr::<u32>(&mut buf);
                     assert_eq!(buf.len(), extra_data[extra_data_idx].len());
                     for j in 0..buf.len() {
                         if let Tag::U32(v) = extra_data[extra_data_idx][j] {
