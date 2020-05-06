@@ -3,6 +3,32 @@
 // The length is usually inferred from the type, except from array (which
 // has a u32 for the number of elements following the tag).
 pub mod tlv {
+
+    /// Valid types and their associated values.
+    ///
+    /// A tag is encoded as a `u8` followed by its values, which is encoded
+    /// in big endian. For example, `Tag::u16(128)` would be encoded as
+    /// `[0x03, 0x00, 0x80]`, where the first `u8`, the value `0x03`, is
+    /// the tag, followed by the value 128.
+    ///
+    /// Arrays are slightly different from other types. The first encoded
+    /// value is still the tag, but it's followed by the number of entries,
+    /// as an `u32`, followed by the type of the tag, as an `u8`. This type
+    /// may be converted into a zero-valued tag with the method
+    /// `Tag::from(v: u8)`. For example:
+    ///
+    /// ```
+    /// let tag = Tag::Array(7, 5); // an u32 array with 7 values
+    /// if let Tag::Array(_, ut) = tag {
+    ///     assert_eq!(Tag::U32(0), Tag::from(ut));
+    /// }
+    /// ```
+    ///
+    /// After the tag, the content of the array is encoded in-place, in big
+    /// endian as well.
+    ///
+    /// See the [TagParser] for descriptions and examples on how to decode
+    /// data.
     enum Tag {
         I8(i8),
         U8(u8),
@@ -20,11 +46,17 @@ pub mod tlv {
         Invalid,
     }
 
+    /// Enable generic decoding implementation of tags.
     trait TagParseHelper<T> {
+        /// Wraps `T` into a [Tag] of the given type.
         fn get_tag(v: T) -> Tag where T: Sized;
+        /// Retrieves the zero [Tag] for the given type `T`.
         fn get_zero_tag() -> Tag;
+        /// Retrieves the size in bytes of type `T`, when encoded.
         fn get_size() -> usize;
+        /// Type's name (useful for more meaningful error messages).
         fn name() -> &'static str;
+        /// Decodes a value `T` from an `u8` slice.
         fn from_buf(buf: &[u8]) -> T where T: Sized;
     }
 
@@ -216,6 +248,10 @@ pub mod tlv {
         }
     }
 
+    /// Converts an `u8` into its zero-valued tag.
+    ///
+    /// This method is mostly useful to retrieve the tag of a decoded
+    /// array. See [Tag] for an example.
     impl std::convert::From<u8> for Tag {
         fn from(v: u8) -> Self {
             match v {
@@ -238,6 +274,11 @@ pub mod tlv {
     }
 
     impl Tag {
+        /// Retrieves the length in bytes required by the value encoded by
+        /// this Tag.
+        ///
+        /// For `Tag::Array`, this only represents the length of the tag
+        /// object (i.e., the number of items and the type of the items).
         pub fn required_length(&self) -> usize {
             match self {
                 Tag::I8(_) => 1,
@@ -258,6 +299,7 @@ pub mod tlv {
         }
     }
 
+    /// Converts the given `u8` slice into a tag of the requested type.
     fn tag_from_buf<T>(buf: &[u8]) -> Tag
     where
         T: TagParseHelper<T>
@@ -362,8 +404,67 @@ pub mod tlv {
         }
     }
 
+    /// Value decoded from a buffer and any trailing data still in the
+    /// buffer.
+    ///
+    /// `TagParser` should only be retrieved by calling
+    /// `TagParser::try_from`. On success, this will retrieve the decoded
+    /// tag, in `TagParser.cur`, and the unread portion of the buffer, in
+    /// `TagParser.next`.
+    ///
+    /// For built-in types (i.e., integers, characters and booleans), the
+    /// decoded value shall be retrieved directly from the decoded tag.
+    /// However, arrays require an extra call to [TagParser.read_arr],
+    /// which read the array and advances the buffer to the next unread
+    /// portion.
+    ///
+    /// #Example
+    ///
+    /// ```
+    /// use std::convert::TryFrom;
+    ///
+    /// // Input buffer, with values to be decoded
+    /// let buf = [1, 0xff, // U8(255)
+    ///            4, 0xff, 0xff, 0xff, 0xff, // I32(-1)
+    ///            12, 0x00, 0x00, 0x00, 0x02, 5, // U32-Array
+    ///                0xff, 0x00, 0x00, 0x01,    // first item
+    ///                0x01, 0x02, 0x03, 0x04,    // second item
+    ///            11, 1, // Bool(true)
+    ///           ];
+    ///
+    /// // Try to decode the basic values
+    /// let tp = TagParser::try_from(&buf[..]).unwrap();
+    /// assert_eq!(tp.cur, Tag::U8(255));
+    /// let tp = TagParser::try_from(tp.next).unwrap();
+    /// assert_eq!(tp.cur, Tag::I32(-1));
+    ///
+    /// // Try to decode, and check the type (in a redundant way), an array
+    /// let tp = TagParser::try_from(tp.next).unwrap();
+    /// assert_eq!(tp.cur, Tag::Array(2, 5));
+    /// if let Tag::Array(_, t) = tp.cur {
+    ///     assert_eq!(Tag::U32(0), Tag::from(t));
+    /// } else {
+    ///     assert!(false);
+    /// }
+    /// // Read the array's content
+    /// let mut u32arr: [u32; 2] = [0, 0];
+    /// let mut tp = tp;
+    /// tp.read_arr::<u32>(&mut u32arr);
+    /// assert_eq!(u32arr[0], 0xff000001);
+    /// assert_eq!(u32arr[1], 0x01020304);
+    ///
+    /// // Decode the rest of the buffer
+    /// let tp = TagParser::try_from(tp.next).unwrap();
+    /// assert_eq!(tp.cur, Tag::Bool(true));
+    ///
+    /// // Ensure that the buffer was completely consume
+    /// assert_eq!(tp.next.len(), 0);
+    /// ```
     pub struct TagParser<'a> {
+        /// The tag decoded from the buffer, and its value.
         cur: Tag,
+        /// Unread portion of the buffer. Should be passed to
+        /// `TagParser::try_from`, to continue decoding the buffer.
         next: &'a[u8],
     }
 
@@ -415,6 +516,8 @@ pub mod tlv {
     }
 
     impl TagParser<'_> {
+        /// Reads the content of a `Tag::Array` into `out`, advancing
+        /// `TagParser.next` to any trailing data after the last item.
         fn read_arr<T>(&mut self, out: &mut [T])
         where
             T: TagParseHelper<T>
@@ -563,5 +666,47 @@ pub mod tlv {
                 },
             }
         }
+    }
+
+    #[test]
+    fn try_from_example() {
+        use std::convert::TryFrom;
+
+        // Input buffer, with values to be decoded
+        let buf = [1, 0xff, // U8(255)
+                   4, 0xff, 0xff, 0xff, 0xff, // I32(-1)
+                   12, 0x00, 0x00, 0x00, 0x02, 5, // U32-Array
+                       0xff, 0x00, 0x00, 0x01,    // first item
+                       0x01, 0x02, 0x03, 0x04,    // second item
+                   11, 1, // Bool(true)
+                  ];
+
+        // Try to decode the basic values
+        let tp = TagParser::try_from(&buf[..]).unwrap();
+        assert_eq!(tp.cur, Tag::U8(255));
+        let tp = TagParser::try_from(tp.next).unwrap();
+        assert_eq!(tp.cur, Tag::I32(-1));
+
+        // Try to decode, and check the type (in a redundant way), an array
+        let tp = TagParser::try_from(tp.next).unwrap();
+        assert_eq!(tp.cur, Tag::Array(2, 5));
+        if let Tag::Array(_, t) = tp.cur {
+            assert_eq!(Tag::U32(0), Tag::from(t));
+        } else {
+            assert!(false);
+        }
+        // Read the array's content
+        let mut u32arr: [u32; 2] = [0, 0];
+        let mut tp = tp;
+        tp.read_arr::<u32>(&mut u32arr);
+        assert_eq!(u32arr[0], 0xff000001);
+        assert_eq!(u32arr[1], 0x01020304);
+
+        // Decode the rest of the buffer
+        let tp = TagParser::try_from(tp.next).unwrap();
+        assert_eq!(tp.cur, Tag::Bool(true));
+
+        // Ensure that the buffer was completely consume
+        assert_eq!(tp.next.len(), 0);
     }
 }
