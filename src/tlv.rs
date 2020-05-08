@@ -3,6 +3,8 @@
 // The length is usually inferred from the type, except from array (which
 // has a u32 for the number of elements following the tag).
 
+use std::io::Write as _;
+
 /// Valid types and their associated values.
 ///
 /// A tag is encoded as a `u8` followed by its values, which is encoded
@@ -55,6 +57,9 @@ trait TagParseHelper<T> {
     fn name() -> &'static str;
     /// Decodes a value `T` from an `u8` slice.
     fn from_buf(buf: &[u8]) -> T where T: Sized;
+    /// Encodes a value `T` from into an `u8` slice, return the slice
+    /// right after the encoded value.
+    fn to_buf<'a>(v: T, buf: &'a mut [u8]) -> &'a mut [u8] where T: Sized;
 }
 
 impl TagParseHelper<u8> for u8 {
@@ -63,6 +68,10 @@ impl TagParseHelper<u8> for u8 {
     fn get_size() -> usize { std::mem::size_of::<u8>() }
     fn name() -> &'static str { "u8" }
     fn from_buf(buf: &[u8]) -> u8 { buf[0] }
+    fn to_buf<'a>(v: u8, buf: &'a mut [u8]) -> &'a mut [u8] {
+        buf[0] = v;
+        &mut buf[std::mem::size_of::<u8>()..]
+    }
 }
 impl TagParseHelper<i8> for i8 {
     fn get_tag(v: i8) -> Tag { Tag::I8(v) }
@@ -70,6 +79,10 @@ impl TagParseHelper<i8> for i8 {
     fn get_size() -> usize { std::mem::size_of::<i8>() }
     fn name() -> &'static str { "i8" }
     fn from_buf(buf: &[u8]) -> i8 { buf[0] as i8 }
+    fn to_buf<'a>(v: i8, buf: &'a mut [u8]) -> &'a mut [u8] {
+        buf[0] = v as u8;
+        &mut buf[std::mem::size_of::<i8>()..]
+    }
 }
 impl TagParseHelper<u16> for u16 {
     fn get_tag(v: u16) -> Tag { Tag::U16(v) }
@@ -79,6 +92,11 @@ impl TagParseHelper<u16> for u16 {
     fn from_buf(buf: &[u8]) -> u16 {
         let arr = [buf[0], buf[1]];
         u16::from_be_bytes(arr)
+    }
+    fn to_buf<'a>(v: u16, buf: &'a mut [u8]) -> &'a mut [u8] {
+        let mut writer = &mut buf[..];
+        writer.write(&v.to_be_bytes()[..]).expect("Encoding failed for u16");
+        &mut buf[std::mem::size_of::<u16>()..]
     }
 }
 impl TagParseHelper<i16> for i16 {
@@ -90,6 +108,11 @@ impl TagParseHelper<i16> for i16 {
         let arr = [buf[0], buf[1]];
         i16::from_be_bytes(arr)
     }
+    fn to_buf<'a>(v: i16, buf: &'a mut [u8]) -> &'a mut [u8] {
+        let mut writer = &mut buf[..];
+        writer.write(&v.to_be_bytes()[..]).expect("Encoding failed for i16");
+        &mut buf[std::mem::size_of::<i16>()..]
+    }
 }
 impl TagParseHelper<u32> for u32 {
     fn get_tag(v: u32) -> Tag { Tag::U32(v) }
@@ -100,6 +123,11 @@ impl TagParseHelper<u32> for u32 {
         let arr = [buf[0], buf[1], buf[2], buf[3]];
         u32::from_be_bytes(arr)
     }
+    fn to_buf<'a>(v: u32, buf: &'a mut [u8]) -> &'a mut [u8] {
+        let mut writer = &mut buf[..];
+        writer.write(&v.to_be_bytes()[..]).expect("Encoding failed for u32");
+        &mut buf[std::mem::size_of::<u32>()..]
+    }
 }
 impl TagParseHelper<i32> for i32 {
     fn get_tag(v: i32) -> Tag { Tag::I32(v) }
@@ -109,6 +137,11 @@ impl TagParseHelper<i32> for i32 {
     fn from_buf(buf: &[u8]) -> i32 {
         let arr = [buf[0], buf[1], buf[2], buf[3]];
         i32::from_be_bytes(arr)
+    }
+    fn to_buf<'a>(v: i32, buf: &'a mut [u8]) -> &'a mut [u8] {
+        let mut writer = &mut buf[..];
+        writer.write(&v.to_be_bytes()[..]).expect("Encoding failed for i32");
+        &mut buf[std::mem::size_of::<i32>()..]
     }
 }
 impl TagParseHelper<u64> for u64 {
@@ -121,6 +154,11 @@ impl TagParseHelper<u64> for u64 {
                    buf[4], buf[5], buf[6], buf[7]];
         u64::from_be_bytes(arr)
     }
+    fn to_buf<'a>(v: u64, buf: &'a mut [u8]) -> &'a mut [u8] {
+        let mut writer = &mut buf[..];
+        writer.write(&v.to_be_bytes()[..]).expect("Encoding failed for u64");
+        &mut buf[std::mem::size_of::<u64>()..]
+    }
 }
 impl TagParseHelper<i64> for i64 {
     fn get_tag(v: i64) -> Tag { Tag::I64(v) }
@@ -131,6 +169,11 @@ impl TagParseHelper<i64> for i64 {
         let arr = [buf[0], buf[1], buf[2], buf[3],
                    buf[4], buf[5], buf[6], buf[7]];
         i64::from_be_bytes(arr)
+    }
+    fn to_buf<'a>(v: i64, buf: &'a mut [u8]) -> &'a mut [u8] {
+        let mut writer = &mut buf[..];
+        writer.write(&v.to_be_bytes()[..]).expect("Encoding failed for i64");
+        &mut buf[std::mem::size_of::<i64>()..]
     }
 }
 impl TagParseHelper<u128> for u128 {
@@ -145,6 +188,11 @@ impl TagParseHelper<u128> for u128 {
                    buf[12], buf[13], buf[14], buf[15]];
         u128::from_be_bytes(arr)
     }
+    fn to_buf<'a>(v: u128, buf: &'a mut [u8]) -> &'a mut [u8] {
+        let mut writer = &mut buf[..];
+        writer.write(&v.to_be_bytes()[..]).expect("Encoding failed for u128");
+        &mut buf[std::mem::size_of::<u128>()..]
+    }
 }
 impl TagParseHelper<i128> for i128 {
     fn get_tag(v: i128) -> Tag { Tag::I128(v) }
@@ -157,6 +205,11 @@ impl TagParseHelper<i128> for i128 {
                    buf[8], buf[9], buf[10], buf[11],
                    buf[12], buf[13], buf[14], buf[15]];
         i128::from_be_bytes(arr)
+    }
+    fn to_buf<'a>(v: i128, buf: &'a mut [u8]) -> &'a mut [u8] {
+        let mut writer = &mut buf[..];
+        writer.write(&v.to_be_bytes()[..]).expect("Encoding failed for i128");
+        &mut buf[std::mem::size_of::<i128>()..]
     }
 }
 
@@ -268,6 +321,24 @@ impl Tag {
             _ => return 0,
         }
     }
+
+    /// Retrieves the enumeration identifier, as used to encode it.
+    pub fn enum_id(&self) -> u8 {
+        match self {
+            Tag::I8(0) => 0x00,
+            Tag::U8(0) => 0x01,
+            Tag::I16(0) => 0x02,
+            Tag::U16(0) => 0x03,
+            Tag::I32(0) => 0x04,
+            Tag::U32(0) => 0x05,
+            Tag::I64(0) => 0x06,
+            Tag::U64(0) => 0x07,
+            Tag::I128(0) => 0x08,
+            Tag::U128(0) => 0x09,
+            Tag::Array(0, 0) => 0x0A,
+            _    => 0,
+        }
+    }
 }
 
 /// Converts the given `u8` slice into a tag of the requested type.
@@ -276,6 +347,37 @@ where
     T: TagParseHelper<T>
 {
     T::get_tag(T::from_buf(buf))
+}
+
+fn encode<'a, T>(v: T, buf: &'a mut [u8]) -> &'a mut [u8]
+where
+    T: TagParseHelper<T>
+{
+    if buf.len() < 1 + T::get_size() {
+        panic!("Buffer too small for {}-tag", T::name());
+    }
+    let next = u8::to_buf(T::get_zero_tag().enum_id(), buf);
+    let next = T::to_buf(v, next);
+    return next;
+}
+
+fn encode_arr<'a, T>(v: &[T], buf: &'a mut [u8]) -> &'a mut [u8]
+where
+    T: TagParseHelper<T> + Copy
+{
+    let exp = 1 + u32::get_size() + 1 + v.len() * T::get_size();
+    if buf.len() < exp {
+        panic!("Buffer too small for {}-tag'ed array (exp: {}, got: {})",
+                T::name(), exp, buf.len());
+    }
+    let next = u8::to_buf(Tag::Array(0, 0).enum_id(), buf);
+    let next = u32::to_buf(v.len() as u32, next);
+    let next = u8::to_buf(T::get_zero_tag().enum_id(), next);
+    let mut next = next;
+    for i in 0..v.len() {
+        next = T::to_buf(v[i], next);
+    }
+    return next;
 }
 
 impl std::convert::From<&Tag> for i8 {
@@ -500,6 +602,9 @@ impl TagParser<'_> {
 mod test {
     use crate::tlv::Tag;
     use crate::tlv::TagParser;
+    use crate::tlv::encode;
+    use crate::tlv::encode_arr;
+    use crate::tlv::TagParseHelper;
 
     static TEST_BUF : [u8; 167] = [
          0, 0xff, // I8(-1)
@@ -667,5 +772,112 @@ mod test {
 
         // Ensure that the buffer was completely consume
         assert_eq!(tp.next.len(), 0);
+    }
+
+    #[test]
+    fn encode_test() {
+        let exp_buf = TEST_BUF;
+        let mut buf = std::vec::Vec::<u8>::with_capacity(exp_buf.len());
+        buf.resize(exp_buf.len(), 0);
+
+        let next = buf.as_mut_slice();
+        assert_eq!(exp_buf.len(), next.len());
+
+        let last_len = next.len();
+        let next = encode::<i8>(-1, next);
+        assert_eq!(next.len(), (last_len - 1 - i8::get_size()));
+
+        let last_len = next.len();
+        let next = encode::<i8>(1, next);
+        assert_eq!(next.len(), (last_len - 1 - i8::get_size()));
+
+        let last_len = next.len();
+        let next = encode::<u8>(0xff, next);
+        assert_eq!(next.len(), (last_len - 1 - u8::get_size()));
+
+        let last_len = next.len();
+        let next = encode::<u8>(16, next);
+        assert_eq!(next.len(), (last_len - 1 - u8::get_size()));
+
+        let last_len = next.len();
+        let next = encode::<i16>(-1, next);
+        assert_eq!(next.len(), (last_len - 1 - i16::get_size()));
+
+        let last_len = next.len();
+        let next = encode::<i16>(256, next);
+        assert_eq!(next.len(), (last_len - 1 - i16::get_size()));
+
+        let last_len = next.len();
+        let next = encode::<u16>(0xff_ff, next);
+        assert_eq!(next.len(), (last_len - 1 - u16::get_size()));
+
+        let last_len = next.len();
+        let next = encode::<u16>(0x10_00, next);
+        assert_eq!(next.len(), (last_len - 1 - u16::get_size()));
+
+        let last_len = next.len();
+        let next = encode::<i32>(-1, next);
+        assert_eq!(next.len(), (last_len - 1 - i32::get_size()));
+
+        let last_len = next.len();
+        let next = encode::<i32>(0x01_00_20_00, next);
+        assert_eq!(next.len(), (last_len - 1 - i32::get_size()));
+
+        let last_len = next.len();
+        let next = encode::<u32>(0xff_ff_ff_ff, next);
+        assert_eq!(next.len(), (last_len - 1 - u32::get_size()));
+
+        let last_len = next.len();
+        let next = encode::<u32>(0x10_02_30_00, next);
+        assert_eq!(next.len(), (last_len - 1 - u32::get_size()));
+
+        let last_len = next.len();
+        let next = encode::<i64>(-1, next);
+        assert_eq!(next.len(), (last_len - 1 - i64::get_size()));
+
+        let last_len = next.len();
+        let next = encode::<i64>(0x01_00_20_00_03_00_40_00, next);
+        assert_eq!(next.len(), (last_len - 1 - i64::get_size()));
+
+        let last_len = next.len();
+        let next = encode::<u64>(0xff_ff_ff_ff_ff_ff_ff_ff, next);
+        assert_eq!(next.len(), (last_len - 1 - u64::get_size()));
+
+        let last_len = next.len();
+        let next = encode::<u64>(0x10_02_30_04_50_06_07_00, next);
+        assert_eq!(next.len(), (last_len - 1 - u64::get_size()));
+
+        let last_len = next.len();
+        let next = encode::<i128>(-1, next);
+        assert_eq!(next.len(), (last_len - 1 - i128::get_size()));
+
+        let last_len = next.len();
+        let next = encode::<i128>(0x01_00_20_00_03_00_40_00_05_00_60_00_07_00_80_00, next);
+        assert_eq!(next.len(), (last_len - 1 - i128::get_size()));
+
+        let last_len = next.len();
+        let next = encode::<u128>(0xff_ff_ff_ff_ff_ff_ff_ff_ff_ff_ff_ff_ff_ff_ff_ff, next);
+        assert_eq!(next.len(), (last_len - 1 - u128::get_size()));
+
+        let last_len = next.len();
+        let next = encode::<u128>(0x10_02_30_04_50_06_70_08_90_0a_b0_0c_d0_0e_f0_00, next);
+        assert_eq!(next.len(), (last_len - 1 - u128::get_size()));
+
+        let last_len = next.len();
+        let _u8: [u8; 7] = [0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07];
+        let next = encode_arr::<u8>(&_u8[..], next);
+        let exp = last_len - 2 - u32::get_size() - _u8.len();
+        assert_eq!(next.len(), exp);
+
+        let last_len = next.len();
+        let _u32: [u32; 1] = [0xff_00_00_01];
+        let next = encode_arr::<u32>(&_u32[..], next);
+        let exp = last_len - 2 - u32::get_size() * (1 + _u32.len());
+        assert_eq!(next.len(), exp);
+
+        let cmp = buf.as_slice();
+        for i in 0..cmp.len() {
+            assert_eq!(cmp[i], exp_buf[i]);
+        }
     }
 }
