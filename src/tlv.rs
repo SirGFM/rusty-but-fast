@@ -599,6 +599,7 @@ impl TagParser<'_> {
     }
 }
 
+#[cfg(test)]
 mod test {
     use crate::tlv::Tag;
     use crate::tlv::TagParser;
