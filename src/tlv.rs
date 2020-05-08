@@ -39,8 +39,6 @@ enum Tag {
     U64(u64),
     I128(i128),
     U128(u128),
-    Char(char),
-    Bool(bool),
     Array(u32, u8),
     Invalid,
 }
@@ -161,20 +159,6 @@ impl TagParseHelper<i128> for i128 {
         i128::from_be_bytes(arr)
     }
 }
-impl TagParseHelper<char> for char {
-    fn get_tag(v: char) -> Tag { Tag::Char(v) }
-    fn get_zero_tag() -> Tag { Tag::Char('\0') }
-    fn get_size() -> usize { std::mem::size_of::<char>() }
-    fn name() -> &'static str { "char" }
-    fn from_buf(buf: &[u8]) -> char { buf[0] as char }
-}
-impl TagParseHelper<bool> for bool {
-    fn get_tag(v: bool) -> Tag { Tag::Bool(v) }
-    fn get_zero_tag() -> Tag { Tag::Bool(false) }
-    fn get_size() -> usize { std::mem::size_of::<bool>() }
-    fn name() -> &'static str { "bool" }
-    fn from_buf(buf: &[u8]) -> bool { buf[0] != 0 }
-}
 
 impl std::cmp::PartialEq for Tag {
     fn eq(&self, other: &Self) -> bool {
@@ -189,8 +173,6 @@ impl std::cmp::PartialEq for Tag {
             (Tag::U64(a), Tag::U64(b)) => a == b,
             (Tag::I128(a), Tag::I128(b)) => a == b,
             (Tag::U128(a), Tag::U128(b)) => a == b,
-            (Tag::Char(a), Tag::Char(b)) => a == b,
-            (Tag::Bool(a), Tag::Bool(b)) => a == b,
             (Tag::Array(la, va), Tag::Array(lb, vb)) => la == lb && va == vb,
             _ => false,
         }
@@ -230,12 +212,6 @@ impl std::fmt::Debug for Tag {
             Tag::U128(v) => {
                 f.write_fmt(format_args!("Tag-u128 {}", v))
             },
-            Tag::Char(v) => {
-                f.write_fmt(format_args!("Tag-char {}", v))
-            },
-            Tag::Bool(v) => {
-                f.write_fmt(format_args!("Tag-bool {}", v))
-            },
             Tag::Array(l, t) => {
                 let tag = Tag::from(*t);
                 f.write_fmt(format_args!("Tag-array [{}, {}]", *t, *l))
@@ -264,9 +240,7 @@ impl std::convert::From<u8> for Tag {
             0x07 => Tag::U64(0),
             0x08 => Tag::I128(0),
             0x09 => Tag::U128(0),
-            0x0A => Tag::Char('\0'),
-            0x0B => Tag::Bool(false),
-            0x0C => Tag::Array(0, 0),
+            0x0A => Tag::Array(0, 0),
             _    => Tag::Invalid,
         }
     }
@@ -290,8 +264,6 @@ impl Tag {
             Tag::U64(_) => 8,
             Tag::I128(_) => 16,
             Tag::U128(_) => 16,
-            Tag::Char(_) => 1,
-            Tag::Bool(_) => 1,
             Tag::Array(_, _) => 4 + 1,
             _ => return 0,
         }
@@ -386,22 +358,6 @@ impl std::convert::From<&Tag> for u128 {
         }
     }
 }
-impl std::convert::From<&Tag> for char {
-    fn from(t: &Tag) -> Self {
-        match t {
-            Tag::Char(v) => *v,
-            _ => panic!("Not an char tag!"),
-        }
-    }
-}
-impl std::convert::From<&Tag> for bool {
-    fn from(t: &Tag) -> Self {
-        match t {
-            Tag::Bool(v) => *v,
-            _ => panic!("Not an bool tag!"),
-        }
-    }
-}
 
 /// Value decoded from a buffer and any trailing data still in the
 /// buffer.
@@ -411,11 +367,10 @@ impl std::convert::From<&Tag> for bool {
 /// tag, in `TagParser.cur`, and the unread portion of the buffer, in
 /// `TagParser.next`.
 ///
-/// For built-in types (i.e., integers, characters and booleans), the
-/// decoded value shall be retrieved directly from the decoded tag.
-/// However, arrays require an extra call to [TagParser.read_arr],
-/// which read the array and advances the buffer to the next unread
-/// portion.
+/// For integer built-in types (i.e., u8, i32 etc), the decoded value shall
+/// be retrieved directly from the decoded tag. However, arrays require an
+/// extra call to [TagParser.read_arr], which read the array and advances
+/// the buffer to the next unread portion.
 ///
 /// #Example
 ///
@@ -425,10 +380,10 @@ impl std::convert::From<&Tag> for bool {
 /// // Input buffer, with values to be decoded
 /// let buf = [1, 0xff, // U8(255)
 ///            4, 0xff, 0xff, 0xff, 0xff, // I32(-1)
-///            12, 0x00, 0x00, 0x00, 0x02, 5, // U32-Array
+///            10, 0x00, 0x00, 0x00, 0x02, 5, // U32-Array
 ///                0xff, 0x00, 0x00, 0x01,    // first item
 ///                0x01, 0x02, 0x03, 0x04,    // second item
-///            11, 1, // Bool(true)
+///            2, 0xff, 0xff, // I16(-1)
 ///           ];
 ///
 /// // Try to decode the basic values
@@ -454,7 +409,7 @@ impl std::convert::From<&Tag> for bool {
 ///
 /// // Decode the rest of the buffer
 /// let tp = TagParser::try_from(tp.next).unwrap();
-/// assert_eq!(tp.cur, Tag::Bool(true));
+/// assert_eq!(tp.cur, Tag::I16(-1));
 ///
 /// // Ensure that the buffer was completely consume
 /// assert_eq!(tp.next.len(), 0);
@@ -493,8 +448,6 @@ impl<'a> std::convert::TryFrom<&'a[u8]> for TagParser<'a> {
             Tag::U64(_) => cur = tag_from_buf::<u64>(buf),
             Tag::I128(_) => cur = tag_from_buf::<i128>(buf),
             Tag::U128(_) => cur = tag_from_buf::<u128>(buf),
-            Tag::Char(_) => cur = tag_from_buf::<char>(buf),
-            Tag::Bool(_) => cur = tag_from_buf::<bool>(buf),
             Tag::Array(_, _) => {
                 let arr = [buf[0], buf[1], buf[2], buf[3]];
                 let len = u32::from_be_bytes(arr);
@@ -548,7 +501,7 @@ mod test {
     use crate::tlv::Tag;
     use crate::tlv::TagParser;
 
-    static TEST_BUF : [u8; 183] = [
+    static TEST_BUF : [u8; 167] = [
          0, 0xff, // I8(-1)
          0, 0x01, // I8(1)
          1, 0xff, // U8(255)
@@ -585,17 +538,9 @@ mod test {
             0x50, 0x06, 0x70, 0x08,
             0x90, 0x0a, 0xb0, 0x0c,
             0xd0, 0x0e, 0xf0, 0x00,
-        10, 0x61, // ord('a')
-        10, 0x41, // ord('A')
-        10, 0x00, // ord('\0')
-        10, 0x0a, // ord('\n')
-        10, 0x0d, // ord('\r')
-        11, 1,
-        11, 0,
-        11, 0x17,
-        12, 0x00, 0x00, 0x00, 0x07, 1 /* U8-Array */,
+        10, 0x00, 0x00, 0x00, 0x07, 1 /* U8-Array */,
             0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07,
-        12, 0x00, 0x00, 0x00, 0x01, 5 /* U32-Array */,
+        10, 0x00, 0x00, 0x00, 0x01, 5 /* U32-Array */,
             0xff, 0x00, 0x00, 0x01,
    ];
 
@@ -629,14 +574,6 @@ mod test {
                    Tag::I128(1329877033820989987636705759212896256),
                    Tag::U128(340282366920938463463374607431768211455),
                    Tag::U128(21279006423615932362580302922658017280),
-                   Tag::Char('a'),
-                   Tag::Char('A'),
-                   Tag::Char('\0'),
-                   Tag::Char('\n'),
-                   Tag::Char('\r'),
-                   Tag::Bool(true),
-                   Tag::Bool(false),
-                   Tag::Bool(true),
                    Tag::Array(7, 1),
                    Tag::Array(1, 5),
                   ];
@@ -697,10 +634,10 @@ mod test {
         // Input buffer, with values to be decoded
         let buf = [1, 0xff, // U8(255)
                    4, 0xff, 0xff, 0xff, 0xff, // I32(-1)
-                   12, 0x00, 0x00, 0x00, 0x02, 5, // U32-Array
+                   10, 0x00, 0x00, 0x00, 0x02, 5, // U32-Array
                        0xff, 0x00, 0x00, 0x01,    // first item
                        0x01, 0x02, 0x03, 0x04,    // second item
-                   11, 1, // Bool(true)
+                   2, 0xff, 0xff, // I16(-1)
                   ];
 
         // Try to decode the basic values
@@ -726,7 +663,7 @@ mod test {
 
         // Decode the rest of the buffer
         let tp = TagParser::try_from(tp.next).unwrap();
-        assert_eq!(tp.cur, Tag::Bool(true));
+        assert_eq!(tp.cur, Tag::I16(-1));
 
         // Ensure that the buffer was completely consume
         assert_eq!(tp.next.len(), 0);
