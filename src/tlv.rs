@@ -401,7 +401,7 @@ macro_rules! gen_buffer {
 /// let next = encode::<u8>(0, next);
 /// encode::<i32>(-1, next);
 /// ```
-fn encode<'a, T>(v: T, buf: &'a mut [u8]) -> &'a mut [u8]
+pub fn encode<'a, T>(v: T, buf: &'a mut [u8]) -> &'a mut [u8]
 where
     T: TagParseHelper<T>
 {
@@ -435,7 +435,7 @@ where
 /// let next = encode_arr::<u64>(&arr[..], next);
 /// encode::<i16>(-1, next);
 /// ```
-fn encode_arr<'a, T>(v: &[T], buf: &'a mut [u8]) -> &'a mut [u8]
+pub fn encode_arr<'a, T>(v: &[T], buf: &'a mut [u8]) -> &'a mut [u8]
 where
     T: TagParseHelper<T> + Copy
 {
