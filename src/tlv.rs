@@ -582,6 +582,57 @@ pub struct TagParser<'a> {
     next: &'a[u8],
 }
 
+impl std::convert::From<&TagParser<'_>> for i8 {
+    fn from(tp: &TagParser<'_>) -> i8 {
+        i8::from(&tp.cur)
+    }
+}
+impl std::convert::From<&TagParser<'_>> for u8 {
+    fn from(tp: &TagParser<'_>) -> u8 {
+        u8::from(&tp.cur)
+    }
+}
+impl std::convert::From<&TagParser<'_>> for i16 {
+    fn from(tp: &TagParser<'_>) -> i16 {
+        i16::from(&tp.cur)
+    }
+}
+impl std::convert::From<&TagParser<'_>> for u16 {
+    fn from(tp: &TagParser<'_>) -> u16 {
+        u16::from(&tp.cur)
+    }
+}
+impl std::convert::From<&TagParser<'_>> for i32 {
+    fn from(tp: &TagParser<'_>) -> i32 {
+        i32::from(&tp.cur)
+    }
+}
+impl std::convert::From<&TagParser<'_>> for u32 {
+    fn from(tp: &TagParser<'_>) -> u32 {
+        u32::from(&tp.cur)
+    }
+}
+impl std::convert::From<&TagParser<'_>> for i64 {
+    fn from(tp: &TagParser<'_>) -> i64 {
+        i64::from(&tp.cur)
+    }
+}
+impl std::convert::From<&TagParser<'_>> for u64 {
+    fn from(tp: &TagParser<'_>) -> u64 {
+        u64::from(&tp.cur)
+    }
+}
+impl std::convert::From<&TagParser<'_>> for i128 {
+    fn from(tp: &TagParser<'_>) -> i128 {
+        i128::from(&tp.cur)
+    }
+}
+impl std::convert::From<&TagParser<'_>> for u128 {
+    fn from(tp: &TagParser<'_>) -> u128 {
+        u128::from(&tp.cur)
+    }
+}
+
 impl<'a> std::convert::TryFrom<&'a[u8]> for TagParser<'a> {
     type Error = &'static str;
 
