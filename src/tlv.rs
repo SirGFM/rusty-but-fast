@@ -574,66 +574,69 @@ impl std::convert::From<&Tag> for u128 {
 /// // Ensure that the buffer was completely consume
 /// assert_eq!(tp.next.len(), 0);
 /// ```
-pub struct TagParser<'a> {
+pub struct TagParser<'a: 'b, 'b> {
     /// The tag decoded from the buffer, and its value.
     cur: Tag,
     /// Unread portion of the buffer. Should be passed to
     /// `TagParser::try_from`, to continue decoding the buffer.
     next: &'a[u8],
+    /// Forces the parser to have a smaller lifetime than the parsing
+    /// slice.
+    phanthom: std::marker::PhantomData<&'b()>,
 }
 
-impl std::convert::From<&TagParser<'_>> for i8 {
-    fn from(tp: &TagParser<'_>) -> i8 {
+impl std::convert::From<&TagParser<'_, '_>> for i8 {
+    fn from(tp: &TagParser<'_, '_>) -> i8 {
         i8::from(&tp.cur)
     }
 }
-impl std::convert::From<&TagParser<'_>> for u8 {
-    fn from(tp: &TagParser<'_>) -> u8 {
+impl std::convert::From<&TagParser<'_, '_>> for u8 {
+    fn from(tp: &TagParser<'_, '_>) -> u8 {
         u8::from(&tp.cur)
     }
 }
-impl std::convert::From<&TagParser<'_>> for i16 {
-    fn from(tp: &TagParser<'_>) -> i16 {
+impl std::convert::From<&TagParser<'_, '_>> for i16 {
+    fn from(tp: &TagParser<'_, '_>) -> i16 {
         i16::from(&tp.cur)
     }
 }
-impl std::convert::From<&TagParser<'_>> for u16 {
-    fn from(tp: &TagParser<'_>) -> u16 {
+impl std::convert::From<&TagParser<'_, '_>> for u16 {
+    fn from(tp: &TagParser<'_, '_>) -> u16 {
         u16::from(&tp.cur)
     }
 }
-impl std::convert::From<&TagParser<'_>> for i32 {
-    fn from(tp: &TagParser<'_>) -> i32 {
+impl std::convert::From<&TagParser<'_, '_>> for i32 {
+    fn from(tp: &TagParser<'_, '_>) -> i32 {
         i32::from(&tp.cur)
     }
 }
-impl std::convert::From<&TagParser<'_>> for u32 {
-    fn from(tp: &TagParser<'_>) -> u32 {
+impl std::convert::From<&TagParser<'_, '_>> for u32 {
+    fn from(tp: &TagParser<'_, '_>) -> u32 {
         u32::from(&tp.cur)
     }
 }
-impl std::convert::From<&TagParser<'_>> for i64 {
-    fn from(tp: &TagParser<'_>) -> i64 {
+impl std::convert::From<&TagParser<'_, '_>> for i64 {
+    fn from(tp: &TagParser<'_, '_>) -> i64 {
         i64::from(&tp.cur)
     }
 }
-impl std::convert::From<&TagParser<'_>> for u64 {
-    fn from(tp: &TagParser<'_>) -> u64 {
+impl std::convert::From<&TagParser<'_, '_>> for u64 {
+    fn from(tp: &TagParser<'_, '_>) -> u64 {
         u64::from(&tp.cur)
     }
 }
-impl std::convert::From<&TagParser<'_>> for i128 {
-    fn from(tp: &TagParser<'_>) -> i128 {
+impl std::convert::From<&TagParser<'_, '_>> for i128 {
+    fn from(tp: &TagParser<'_, '_>) -> i128 {
         i128::from(&tp.cur)
     }
 }
-impl std::convert::From<&TagParser<'_>> for u128 {
-    fn from(tp: &TagParser<'_>) -> u128 {
+impl std::convert::From<&TagParser<'_, '_>> for u128 {
+    fn from(tp: &TagParser<'_, '_>) -> u128 {
         u128::from(&tp.cur)
     }
 }
 
-impl<'a> std::convert::TryFrom<&'a[u8]> for TagParser<'a> {
+impl<'a: 'b, 'b> std::convert::TryFrom<&'a[u8]> for TagParser<'a, 'b> {
     type Error = &'static str;
 
     fn try_from(buf: &'a[u8]) -> Result<Self, Self::Error> {
@@ -673,12 +676,13 @@ impl<'a> std::convert::TryFrom<&'a[u8]> for TagParser<'a> {
         let tp = TagParser{
             cur: cur,
             next: &buf[len..],
+            phanthom: std::marker::PhantomData,
         };
         return Ok(tp);
     }
 }
 
-impl TagParser<'_> {
+impl<'a: 'b, 'b> TagParser<'a, 'b> {
     /// Reads the content of a `Tag::Array` into `out`, advancing
     /// `TagParser.next` to any trailing data after the last item.
     fn read_arr<T>(&mut self, out: &mut [T])
@@ -705,6 +709,10 @@ impl TagParser<'_> {
             }
         }
         panic!("Invalid {}-array tag!", T::name());
+    }
+
+    pub fn get_next(&'b self) -> &'a[u8] {
+        return self.next;
     }
 }
 
