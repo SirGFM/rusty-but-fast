@@ -30,7 +30,7 @@ use std::io::Write as _;
 ///
 /// See the [TagParser] for descriptions and examples on how to decode
 /// data.
-enum Tag {
+pub enum Tag {
     I8(i8),
     U8(u8),
     I16(i16),
@@ -46,7 +46,7 @@ enum Tag {
 }
 
 /// Enable generic decoding implementation of tags.
-trait TagParseHelper<T> {
+pub trait TagParseHelper<T> {
     /// Wraps `T` into a [Tag] of the given type.
     fn get_tag(v: T) -> Tag where T: Sized;
     /// Retrieves the zero [Tag] for the given type `T`.
@@ -350,7 +350,7 @@ where
 }
 
 /// Retrieves the size of the buffer required to encode the given type.
-fn get_encoded_size<T>() -> usize
+pub fn get_encoded_size<T>() -> usize
 where
     T: TagParseHelper<T>
 {
@@ -358,11 +358,27 @@ where
 }
 
 /// Retrieves the size of the buffer required to encode the given array.
-fn get_encoded_arr_size<T>(v: &[T]) -> usize
+pub fn get_encoded_arr_size<T>(v: &[T]) -> usize
 where
     T: TagParseHelper<T>
 {
     1 + u32::get_size() + 1 + v.len() * T::get_size()
+}
+
+/// Generate a Vec::<u8> big enough to hold tags of the supplied types.
+#[macro_export]
+macro_rules! gen_buffer {
+    ( $( $x:ty ),* ) => {
+        {
+            let mut size = 0;
+            $(
+                size = size + tlv::get_encoded_size::<$x>();
+            )*
+            let mut buf = std::vec::Vec::<u8>::with_capacity(size);
+            buf.resize(size, 0);
+            buf
+        }
+    };
 }
 
 /// Encodes a value into a buffer, and returns the slice where more data
