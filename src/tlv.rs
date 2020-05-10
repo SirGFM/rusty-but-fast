@@ -349,11 +349,47 @@ where
     T::get_tag(T::from_buf(buf))
 }
 
+/// Retrieves the size of the buffer required to encode the given type.
+fn get_encoded_size<T>() -> usize
+where
+    T: TagParseHelper<T>
+{
+    1 + T::get_size()
+}
+
+/// Retrieves the size of the buffer required to encode the given array.
+fn get_encoded_arr_size<T>(v: &[T]) -> usize
+where
+    T: TagParseHelper<T>
+{
+    1 + u32::get_size() + 1 + v.len() * T::get_size()
+}
+
+/// Encodes a value into a buffer, and returns the slice where more data
+/// may be encoded.
+///
+/// # Panics
+///
+/// Panics if the buffer isn't big enough. Use [get_encoded_size] when
+/// reserving memory for the buffer.
+///
+/// # Examples
+///
+/// ```
+/// // Encode an u8 followed by an i32
+/// let size = get_encoded_size::<u8>() + get_encoded_size::<u32>();
+/// let mut buf = std::vec::Vec::<u8>::with_capacity(size);
+/// buf.resize(size, 0);
+///
+/// let next = buf.as_mut_slice();
+/// let next = encode::<u8>(0, next);
+/// encode::<i32>(-1, next);
+/// ```
 fn encode<'a, T>(v: T, buf: &'a mut [u8]) -> &'a mut [u8]
 where
     T: TagParseHelper<T>
 {
-    if buf.len() < 1 + T::get_size() {
+    if buf.len() < get_encoded_size::<T>() {
         panic!("Buffer too small for {}-tag", T::name());
     }
     let next = u8::to_buf(T::get_zero_tag().enum_id(), buf);
@@ -361,11 +397,33 @@ where
     return next;
 }
 
+/// Encodes an array into a buffer, and returns the slice where more data
+/// may be encoded.
+///
+/// # Panics
+///
+/// Panics if the buffer isn't big enough. Use [get_encoded_arr_size] when
+/// reserving memory for the buffer.
+///
+/// # Examples
+///
+/// ```
+/// // Encode an array of u64 followed by an i16
+/// let arr: [u64; 3] = [0; 3];
+/// let size = get_encoded_arr_size::<u64>(&arr[..]);
+/// let size = size + get_encoded_size::<i16>();
+/// let mut buf = std::vec::Vec::<u8>::with_capacity(size);
+/// buf.resize(size, 0);
+///
+/// let next = buf.as_mut_slice();
+/// let next = encode_arr::<u64>(&arr[..], next);
+/// encode::<i16>(-1, next);
+/// ```
 fn encode_arr<'a, T>(v: &[T], buf: &'a mut [u8]) -> &'a mut [u8]
 where
     T: TagParseHelper<T> + Copy
 {
-    let exp = 1 + u32::get_size() + 1 + v.len() * T::get_size();
+    let exp = get_encoded_arr_size::<T>(v);
     if buf.len() < exp {
         panic!("Buffer too small for {}-tag'ed array (exp: {}, got: {})",
                 T::name(), exp, buf.len());
@@ -603,6 +661,8 @@ impl TagParser<'_> {
 mod test {
     use crate::tlv::Tag;
     use crate::tlv::TagParser;
+    use crate::tlv::get_encoded_size;
+    use crate::tlv::get_encoded_arr_size;
     use crate::tlv::encode;
     use crate::tlv::encode_arr;
     use crate::tlv::TagParseHelper;
@@ -773,6 +833,33 @@ mod test {
 
         // Ensure that the buffer was completely consume
         assert_eq!(tp.next.len(), 0);
+    }
+
+    #[test]
+    fn encode_example() {
+        // fn encode example:
+
+        // Encode an u8 followed by an i32
+        let size = get_encoded_size::<u8>() + get_encoded_size::<u32>();
+        let mut buf = std::vec::Vec::<u8>::with_capacity(size);
+        buf.resize(size, 0);
+
+        let next = buf.as_mut_slice();
+        let next = encode::<u8>(0, next);
+        encode::<i32>(-1, next);
+
+        // fn encode_arr example:
+
+        // Encode an array of u64 followed by an i16
+        let arr: [u64; 3] = [0; 3];
+        let size = get_encoded_arr_size::<u64>(&arr[..]);
+        let size = size + get_encoded_size::<i16>();
+        let mut buf = std::vec::Vec::<u8>::with_capacity(size);
+        buf.resize(size, 0);
+
+        let next = buf.as_mut_slice();
+        let next = encode_arr::<u64>(&arr[..], next);
+        encode::<i16>(-1, next);
     }
 
     #[test]
