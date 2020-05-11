@@ -2,6 +2,7 @@
 
 use std::convert::From;
 use std::convert::TryFrom;
+use std::io::Read;
 use std::io::Write;
 use std::net;
 use std::sync;
@@ -43,6 +44,7 @@ impl std::convert::From<Message> for u8 {
     }
 }
 
+#[derive(std::cmp::PartialEq)]
 enum Status {
     Ok,
     NOk,
@@ -257,7 +259,7 @@ impl<'a> Timer {
 
                     let next = tlv::encode::<u8>(st, next);
                     let next = tlv::encode::<u64>(dur.as_secs(), next);
-                    tlv::encode::<u32>(dur.subsec_millis(), next);
+                    tlv::encode::<u32>(dur.subsec_nanos(), next);
                 } else {
                     buf = gen_buffer!(u8);
                     let st = u8::from(Status::Ok);
@@ -292,6 +294,143 @@ impl<'a> Timer {
     fn test_get(&self) -> time::Duration {
         self.send_get().unwrap()
     }
+}
+
+fn send_msg(prefix: &[u8], m: Message, conn: &mut net::TcpStream) ->
+Result<(), Error>
+{
+    let size = prefix.len() + tlv::get_encoded_size::<u8>();
+    let mut buf = std::vec::Vec::<u8>::with_capacity(size);
+    buf.resize(size, 0);
+
+    let next = buf.as_mut_slice();
+    for i in 0..prefix.len() {
+        next[i] = prefix[i];
+    }
+    let next = &mut next[prefix.len()..];
+    let m = u8::from(m);
+    tlv::encode::<u8>(m, next);
+
+    match conn.write(buf.as_slice()) {
+        Ok(_) => {
+            return Ok(());
+        },
+        Err(err) => {
+            println!("timer: Failed to send request: {}", err);
+            return Err("Failed to send request");
+        },
+    }
+}
+
+fn get_response<'a>(out: &'a mut [u8], conn: &mut net::TcpStream) ->
+Result<&'a [u8], Error>
+{
+    match conn.read(out) {
+        Ok(len) => {
+            if out.len() != len {
+                println!("timer: Didn't get as much data as expected (exp: {}, got: {})", out.len(), len);
+                return Err("timer: Didn't get as much data as expected");
+            }
+            let buf = &out[..];
+            let tp = match tlv::TagParser::try_from(buf) {
+                Err(err) => {
+                    println!("timer: Didn't find seconds in response: {}", err);
+                    return Err("timer: Current parse Get reponse");
+                },
+                Ok(tp) => tp,
+            };
+            let st = Status::from(u8::from(&tp));
+            if st == Status::NOk {
+                return Err("timer: Operation failed!");
+            } else {
+                return Ok(tp.get_next());
+            }
+        },
+        Err(err) => {
+            println!("timer: Failed to get a response: {}", err);
+            return Err("timer: Failed to get a response");
+        },
+    }
+}
+
+pub fn start(prefix: &[u8], conn: &mut net::TcpStream) ->
+Result<(), Error>
+{
+    let res = send_msg(prefix, Message::Start, conn);
+    if let Err(_) = res {
+        return res;
+    }
+    let mut out_buf = gen_buffer!(u8);
+    let res = get_response(out_buf.as_mut_slice(), conn);
+    if let Err(err) = res {
+        return Err(err);
+    } else {
+        return Ok(());
+    }
+}
+
+pub fn stop(prefix: &[u8], conn: &mut net::TcpStream) ->
+Result<(), Error>
+{
+    let res = send_msg(prefix, Message::Stop, conn);
+    if let Err(_) = res {
+        return res;
+    }
+    let mut out_buf = gen_buffer!(u8);
+    let res = get_response(out_buf.as_mut_slice(), conn);
+    if let Err(err) = res {
+        return Err(err);
+    } else {
+        return Ok(());
+    }
+}
+
+pub fn reset(prefix: &[u8], conn: &mut net::TcpStream) ->
+Result<(), Error>
+{
+    let res = send_msg(prefix, Message::Reset, conn);
+    if let Err(_) = res {
+        return res;
+    }
+    let mut out_buf = gen_buffer!(u8);
+    let res = get_response(out_buf.as_mut_slice(), conn);
+    if let Err(err) = res {
+        return Err(err);
+    } else {
+        return Ok(());
+    }
+}
+
+pub fn get(prefix: &[u8], conn: &mut net::TcpStream) ->
+Result<time::Duration, Error>
+{
+    let res = send_msg(prefix, Message::Get, conn);
+    if let Err(err) = res {
+        return Err(err);
+    }
+    let mut out_buf = gen_buffer!(u8, u64, u32);
+    let res = get_response(out_buf.as_mut_slice(), conn);
+    let next = match res {
+        Err(err) => return Err(err),
+        Ok(next) => next,
+    };
+    let tp = match tlv::TagParser::try_from(next) {
+        Err(err) => {
+            println!("timer: Didn't find seconds in response: {}", err);
+            return Err("timer: Current parse Get reponse");
+        },
+        Ok(tp) => tp,
+    };
+    let sec = u64::from(&tp);
+    let tp = match tlv::TagParser::try_from(tp.get_next()) {
+        Err(err) => {
+            println!("timer: Didn't find nanoseconds in response: {}", err);
+            return Err("timer: Current parse Get reponse");
+        },
+        Ok(tp) => tp,
+    };
+    let ns = u32::from(&tp);
+    return Ok(time::Duration::new(sec, ns));
 }
 
 impl Drop for Timer {
