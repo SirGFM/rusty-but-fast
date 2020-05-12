@@ -148,8 +148,7 @@ pub fn new_server() -> Timer {
                                     let dt = new_now.duration_since(now);
                                     data.cur = acc + dt;
                                 } else {
-                                    let t = time::Duration::from_millis(0);
-                                    data.cur = t;
+                                    data.cur = acc;
                                 }
                                 data.updated = true;
                                 cvar.notify_one();
