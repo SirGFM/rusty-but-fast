@@ -96,6 +96,16 @@ pub struct Timer {
     thread: Option<std::thread::JoinHandle<()>>,
 }
 
+impl std::clone::Clone for Timer {
+    fn clone(&self) -> Self {
+        Timer {
+            tx: self.tx.clone(),
+            shared: self.shared.clone(),
+            thread: None,
+        }
+    }
+}
+
 /// Configures the server-side of the timer. Must be called by the server
 /// before it may handle any `timer` request.
 pub fn new_server() -> Timer {
@@ -286,15 +296,17 @@ impl<'a> Timer {
 
 impl Drop for Timer {
     fn drop(&mut self) {
+        /* Avoid issuing a 'Quit' when a non-main thread closes */
+        let loc_thread = match self.thread.take() {
+            Some(thread) => thread,
+            None => return,
+        };
+
         if let Err(err) = self.tx.send(Message::Quit) {
             println!("timer: Failed to signal timer to quit: {}", err);
         } else {
-            if let Some(thread) = self.thread.take() {
-                if let Err(_) = thread.join() {
-                    println!("timer: Failed to join on the timer thread");
-                }
-            } else {
-                println!("timer: Failed to retrieve the handle to the timer thread");
+            if let Err(_) = loc_thread.join() {
+                println!("timer: Failed to join on the timer thread");
             }
         }
     }
