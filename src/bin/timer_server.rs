@@ -50,7 +50,7 @@ fn handle_client(data: ClientData) {
 fn run_server(addr: [u8; 4], port: u16, running: std::sync::Arc<AtomicBool>) {
     use std::time::Duration as Duration;
 
-    let t = timer::new_server();
+    let t = timer::new();
 
     let addrs = [
         std::net::SocketAddr::from((addr, port)),

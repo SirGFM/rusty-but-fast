@@ -77,15 +77,17 @@ struct SharedTimer {
     cur: time::Duration,
 }
 
-/// Remote timer controlled by TCP requests.
+/// Timer for tracking elapsed time.
 ///
-/// The timer must be initialized by calling `new_server(). This starts a
-/// background thread that keeps track of elapsed time. To issue commands
-/// to this thread, use [Timer.handle_request] on a previously configured,
-/// and accepted, TCP connection.
+/// The timer must be initialized by calling [timer::new()]. This starts a
+/// background thread that keeps track of the elapsed time. This background
+/// thread shall be automatically managed by this struct, and is
+/// automatically joined when the `Timer` drops.
 ///
-/// The background thread shall be automatically managed by this struct,
-/// and is automatically joined when the `Timer` drops.
+/// The timer may also be controlled remotelly, using the
+/// [Timer.handle_request()] method. To issue commands to the timer, use
+/// methods [timer::start()], [timer::stop()], [timer::reset()] and
+/// [timer::get()] with a TCP connection to the `Timer`.
 pub struct Timer {
     /// Channel used to send messages from the main thread to the
     /// timer thread.
@@ -108,9 +110,8 @@ impl std::clone::Clone for Timer {
     }
 }
 
-/// Configures the server-side of the timer. Must be called by the server
-/// before it may handle any `timer` request.
-pub fn new_server() -> Timer {
+/// Initialize a new timer, setting up the background thread.
+pub fn new() -> Timer {
     let (tx, rx) = mpsc::channel::<Message>();
     let now = time::Instant::now();
 
@@ -192,7 +193,40 @@ pub fn new_server() -> Timer {
 type Error = &'static str;
 
 impl<'a> Timer {
-    fn send_get(&self) -> Result<time::Duration, Error> {
+    fn send(&self, m: Message) -> Result<(), Error> {
+        if self.tx.send(m).is_err() {
+            match m {
+                Message::Start => Err("StartTimer"),
+                Message::Stop => Err("StopTimer"),
+                Message::Reset => Err("ResetTimer"),
+                Message::Get => Err("GetAccumulatedTime"),
+                Message::Quit => Err("DropTimer"),
+            }
+        } else {
+            Ok(())
+        }
+    }
+
+    fn wrapped_send(&self, m: Message) -> Result<time::Duration, Error> {
+        match self.send(m) {
+            Err(err) => Err(err),
+            Ok(_) => Ok(time::Duration::from_millis(0)),
+        }
+    }
+
+    pub fn start(&self) -> Result<(), Error> {
+        self.send(Message::Start)
+    }
+
+    pub fn stop(&self) -> Result<(), Error> {
+        self.send(Message::Stop)
+    }
+
+    pub fn reset(&self) -> Result<(), Error> {
+        self.send(Message::Reset)
+    }
+
+    pub fn get(&self) -> Result<time::Duration, Error> {
         let (shared, cvar) = &*self.shared;
         let mut data = match shared.lock() {
             Ok(mut ok_data) => ok_data,
@@ -202,9 +236,8 @@ impl<'a> Timer {
             },
         };
 
-        if let Err(err) = self.tx.send(Message::Get) {
-            println!("timer: Failed to send a get message: {}", err);
-            return Err("timer: Failed to send a get message");
+        if self.tx.send(Message::Get).is_err() {
+            return Err(Error::GetAccumulatedTime);
         }
 
         while !data.updated {
@@ -233,15 +266,9 @@ impl<'a> Timer {
         let res;
         let m = Message::from(u8::from(&tp));
         if m == Message::Get {
-            res = self.send_get();
+            res = self.get();
         } else {
-            res = match self.tx.send(m) {
-                Ok(_) => Ok(time::Duration::from_millis(0)),
-                Err(err) => {
-                    println!("timer: Failed to send message: {}", err);
-                    Err("timer: Failed to send message")
-                },
-            };
+            res = self.wrapped_send(m);
         }
 
         let mut buf;
@@ -277,22 +304,6 @@ impl<'a> Timer {
                 return Err("Failed to reply to client");
             },
         }
-    }
-
-    fn handle_start(&self) -> Result<(), mpsc::SendError<Message>> {
-        self.tx.send(Message::Start)
-    }
-
-    fn handle_stop(&self) -> Result<(), mpsc::SendError<Message>> {
-        self.tx.send(Message::Stop)
-    }
-
-    fn handle_reset(&self) -> Result<(), mpsc::SendError<Message>> {
-        self.tx.send(Message::Reset)
-    }
-
-    fn test_get(&self) -> time::Duration {
-        self.send_get().unwrap()
     }
 }
 
@@ -441,7 +452,7 @@ impl Drop for Timer {
             None => return,
         };
 
-        if let Err(err) = self.tx.send(Message::Quit) {
+        if let Err(err) = self.send(Message::Quit) {
             println!("timer: Failed to signal timer to quit: {}", err);
         } else {
             if let Err(_) = loc_thread.join() {
@@ -474,7 +485,7 @@ mod test {
 
     #[test]
     fn spawn_timer() {
-        let t = timer::new_server();
+        let t = timer::new();
 
         // XXX: Usually, the difference stays perfectly under 0.5ms.
         // However, I've seen it get as large as 2.5ms. This shouldn't
@@ -482,29 +493,29 @@ mod test {
         // more lenient.
         let err = time::Duration::from_micros(800);
 
-        t.handle_start().expect("Failed to start the timer");
+        t.start().expect("Failed to start the timer");
         let exp = time::Duration::from_millis(2);
         std::thread::sleep(exp);
-        let dt = t.test_get();
+        let dt = t.get().unwrap();
         let diff = get_time_diff(dt, exp, err);
         assert!(diff < err);
 
-        t.handle_stop().expect("Failed to pause the timer");
+        t.stop().expect("Failed to pause the timer");
         std::thread::sleep(time::Duration::from_millis(1));
-        t.handle_start().expect("Failed to continue the timer");
-        let dt = t.test_get();
+        t.start().expect("Failed to continue the timer");
+        let dt = t.get().unwrap();
         let diff = get_time_diff(dt, exp, err);
         assert!(diff < err);
 
-        t.handle_reset().expect("Failed to restart the timer");
+        t.reset().expect("Failed to restart the timer");
         let exp = time::Duration::from_millis(0);
-        let dt = t.test_get();
+        let dt = t.get().unwrap();
         let diff = get_time_diff(dt, exp, err);
         assert!(diff < err);
 
         let exp = time::Duration::from_millis(1);
         std::thread::sleep(time::Duration::from_millis(1));
-        let dt = t.test_get();
+        let dt = t.get().unwrap();
         let diff = get_time_diff(dt, exp, err);
         assert!(diff < err);
     }
