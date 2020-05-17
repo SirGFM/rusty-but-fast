@@ -11,6 +11,85 @@ use std::time;
 use crate::tlv;
 use crate::gen_buffer;
 
+/// Represent possible failure causes.
+#[derive(Clone, Copy, std::cmp::PartialEq)]
+pub enum Error {
+    StartTimer,
+    StopTimer,
+    ResetTimer,
+    GetAccumulatedTime,
+    DropTimer,
+    LockGetCVar,
+    WaitGetCVar,
+    BadMessageTag,
+    SendReply,
+    SendStart,
+    SendStop,
+    SendReset,
+    SendGet,
+    SendQuit,
+    BadResponseLen,
+    BadResponseTag,
+    OperationFailed,
+    GetError,
+    MissingSeconds,
+    MissingNanoSeconds,
+}
+
+impl std::fmt::Debug for Error {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        match self {
+            Error::StartTimer => f.write_fmt(format_args!("StartTimer")),
+            Error::StopTimer => f.write_fmt(format_args!("StopTimer")),
+            Error::ResetTimer => f.write_fmt(format_args!("ResetTimer")),
+            Error::GetAccumulatedTime => f.write_fmt(format_args!("GetAccumulatedTime")),
+            Error::DropTimer => f.write_fmt(format_args!("DropTimer")),
+            Error::LockGetCVar => f.write_fmt(format_args!("LockGetCVar")),
+            Error::WaitGetCVar => f.write_fmt(format_args!("WaitGetCVar")),
+            Error::BadMessageTag => f.write_fmt(format_args!("BadMessageTag")),
+            Error::SendReply => f.write_fmt(format_args!("SendReply")),
+            Error::SendStart => f.write_fmt(format_args!("SendStart")),
+            Error::SendStop => f.write_fmt(format_args!("SendStop")),
+            Error::SendReset => f.write_fmt(format_args!("SendReset")),
+            Error::SendGet => f.write_fmt(format_args!("SendGet")),
+            Error::SendQuit => f.write_fmt(format_args!("SendQuit")),
+            Error::BadResponseLen => f.write_fmt(format_args!("BadResponseLen")),
+            Error::BadResponseTag => f.write_fmt(format_args!("BadResponseTag")),
+            Error::OperationFailed => f.write_fmt(format_args!("OperationFailed")),
+            Error::GetError => f.write_fmt(format_args!("GetError")),
+            Error::MissingSeconds => f.write_fmt(format_args!("MissingSeconds")),
+            Error::MissingNanoSeconds => f.write_fmt(format_args!("MissingNanoSeconds")),
+        }
+    }
+}
+
+impl std::fmt::Display for Error {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Error::StartTimer => write!(f, "StartTimer"),
+            Error::StopTimer => write!(f, "StopTimer"),
+            Error::ResetTimer => write!(f, "ResetTimer"),
+            Error::GetAccumulatedTime => write!(f, "GetAccumulatedTime"),
+            Error::DropTimer => write!(f, "DropTimer"),
+            Error::LockGetCVar => write!(f, "LockGetCVar"),
+            Error::WaitGetCVar => write!(f, "WaitGetCVar"),
+            Error::BadMessageTag => write!(f, "BadMessageTag"),
+            Error::SendReply => write!(f, "SendReply"),
+            Error::SendStart => write!(f, "SendStart"),
+            Error::SendStop => write!(f, "SendStop"),
+            Error::SendReset => write!(f, "SendReset"),
+            Error::SendGet => write!(f, "SendGet"),
+            Error::SendQuit => write!(f, "SendQuit"),
+            Error::BadResponseLen => write!(f, "BadResponseLen"),
+            Error::BadResponseTag => write!(f, "BadResponseTag"),
+            Error::OperationFailed => write!(f, "OperationFailed"),
+            Error::GetError => write!(f, "GetError"),
+            Error::MissingSeconds => write!(f, "MissingSeconds"),
+            Error::MissingNanoSeconds => write!(f, "MissingNanoSeconds"),
+        }
+    }
+}
+
 /// Commands to control the timer.
 #[derive(Clone, Copy, std::cmp::PartialEq)]
 enum Message {
@@ -190,17 +269,15 @@ pub fn new() -> Timer {
     return t;
 }
 
-type Error = &'static str;
-
 impl<'a> Timer {
     fn send(&self, m: Message) -> Result<(), Error> {
         if self.tx.send(m).is_err() {
             match m {
-                Message::Start => Err("StartTimer"),
-                Message::Stop => Err("StopTimer"),
-                Message::Reset => Err("ResetTimer"),
-                Message::Get => Err("GetAccumulatedTime"),
-                Message::Quit => Err("DropTimer"),
+                Message::Start => Err(Error::StartTimer),
+                Message::Stop => Err(Error::StopTimer),
+                Message::Reset => Err(Error::ResetTimer),
+                Message::Get => Err(Error::GetAccumulatedTime),
+                Message::Quit => Err(Error::DropTimer),
             }
         } else {
             Ok(())
@@ -231,8 +308,7 @@ impl<'a> Timer {
         let mut data = match shared.lock() {
             Ok(mut ok_data) => ok_data,
             Err(err) => {
-                println!("timer: Failed to get the current time: {}", err);
-                return Err("timer: Failed to get the current time");
+                return Err(Error::LockGetCVar);
             },
         };
 
@@ -244,8 +320,7 @@ impl<'a> Timer {
             data = match cvar.wait(data) {
                 Ok(mut ok_data) => ok_data,
                 Err(err) => {
-                    println!("timer: Failed to wait on the conditional variable the current time: {}", err);
-                    return Err("timer: Failed to wait for the current time");
+                    return Err(Error::WaitGetCVar);
                 },
             };
         }
@@ -260,7 +335,7 @@ impl<'a> Timer {
         let tp;
         match tlv::TagParser::try_from(req) {
             Ok(ok_tp) => tp = ok_tp,
-            Err(err) => return Err(err),
+            Err(err) => return Err(Error::BadMessageTag),
         }
 
         let res;
@@ -300,8 +375,7 @@ impl<'a> Timer {
                 return Ok(tp.get_next());
             },
             Err(err) => {
-                println!("timer: Failed to reply to client: {}", err);
-                return Err("Failed to reply to client");
+                return Err(Error::SendReply);
             },
         }
     }
@@ -319,16 +393,21 @@ Result<(), Error>
         next[i] = prefix[i];
     }
     let next = &mut next[prefix.len()..];
-    let m = u8::from(m);
-    tlv::encode::<u8>(m, next);
+    let m_val = u8::from(m);
+    tlv::encode::<u8>(m_val, next);
 
     match conn.write(buf.as_slice()) {
         Ok(_) => {
             return Ok(());
         },
         Err(err) => {
-            println!("timer: Failed to send request: {}", err);
-            return Err("Failed to send request");
+            return Err(match m {
+                Message::Start => Error::SendStart,
+                Message::Stop => Error::SendStop,
+                Message::Reset => Error::SendReset,
+                Message::Get => Error::SendGet,
+                Message::Quit => Error::SendQuit,
+            });
         },
     }
 }
@@ -339,104 +418,83 @@ Result<&'a [u8], Error>
     match conn.read(out) {
         Ok(len) => {
             if out.len() != len {
-                println!("timer: Didn't get as much data as expected (exp: {}, got: {})", out.len(), len);
-                return Err("timer: Didn't get as much data as expected");
+                return Err(Error::BadResponseLen);
             }
             let buf = &out[..];
             let tp = match tlv::TagParser::try_from(buf) {
                 Err(err) => {
-                    println!("timer: Didn't find seconds in response: {}", err);
-                    return Err("timer: Current parse Get reponse");
+                    return Err(Error::BadResponseTag);
                 },
                 Ok(tp) => tp,
             };
             let st = Status::from(u8::from(&tp));
             if st == Status::NOk {
-                return Err("timer: Operation failed!");
+                return Err(Error::OperationFailed);
             } else {
                 return Ok(tp.get_next());
             }
         },
         Err(err) => {
-            println!("timer: Failed to get a response: {}", err);
-            return Err("timer: Failed to get a response");
+            return Err(Error::GetError);
         },
+    }
+}
+
+fn send(prefix: &[u8], conn: &mut net::TcpStream, m: Message) ->
+Result<(), Error>
+{
+    let res = send_msg(prefix, m, conn);
+    if res.is_err() {
+        return res;
+    }
+    let mut out_buf = gen_buffer!(u8);
+    match get_response(out_buf.as_mut_slice(), conn) {
+        Err(err) => Err(err),
+        Ok(_) => Ok(()),
     }
 }
 
 pub fn start(prefix: &[u8], conn: &mut net::TcpStream) ->
 Result<(), Error>
 {
-    let res = send_msg(prefix, Message::Start, conn);
-    if let Err(_) = res {
-        return res;
-    }
-    let mut out_buf = gen_buffer!(u8);
-    let res = get_response(out_buf.as_mut_slice(), conn);
-    if let Err(err) = res {
-        return Err(err);
-    } else {
-        return Ok(());
-    }
+    send(prefix, conn, Message::Start)
 }
 
 pub fn stop(prefix: &[u8], conn: &mut net::TcpStream) ->
 Result<(), Error>
 {
-    let res = send_msg(prefix, Message::Stop, conn);
-    if let Err(_) = res {
-        return res;
-    }
-    let mut out_buf = gen_buffer!(u8);
-    let res = get_response(out_buf.as_mut_slice(), conn);
-    if let Err(err) = res {
-        return Err(err);
-    } else {
-        return Ok(());
-    }
+    send(prefix, conn, Message::Stop)
 }
 
 pub fn reset(prefix: &[u8], conn: &mut net::TcpStream) ->
 Result<(), Error>
 {
-    let res = send_msg(prefix, Message::Reset, conn);
-    if let Err(_) = res {
-        return res;
-    }
-    let mut out_buf = gen_buffer!(u8);
-    let res = get_response(out_buf.as_mut_slice(), conn);
-    if let Err(err) = res {
-        return Err(err);
-    } else {
-        return Ok(());
-    }
+    send(prefix, conn, Message::Reset)
 }
 
 pub fn get(prefix: &[u8], conn: &mut net::TcpStream) ->
 Result<time::Duration, Error>
 {
     let res = send_msg(prefix, Message::Get, conn);
-    if let Err(err) = res {
-        return Err(err);
+    if res.is_err() {
+        return Err(res.unwrap_err());
     }
     let mut out_buf = gen_buffer!(u8, u64, u32);
     let res = get_response(out_buf.as_mut_slice(), conn);
     let next = match res {
-        Err(err) => return Err(err),
+        Err(err) => return Err(res.unwrap_err()),
         Ok(next) => next,
     };
     let tp = match tlv::TagParser::try_from(next) {
         Err(err) => {
-            println!("timer: Didn't find seconds in response: {}", err);
-            return Err("timer: Current parse Get reponse");
+            return Err(Error::MissingSeconds);
         },
         Ok(tp) => tp,
     };
     let sec = u64::from(&tp);
     let tp = match tlv::TagParser::try_from(tp.get_next()) {
         Err(err) => {
-            println!("timer: Didn't find nanoseconds in response: {}", err);
-            return Err("timer: Current parse Get reponse");
+            return Err(Error::MissingNanoSeconds);
         },
         Ok(tp) => tp,
     };
